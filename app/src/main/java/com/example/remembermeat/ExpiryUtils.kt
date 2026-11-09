@@ -16,7 +16,7 @@ fun expiryText(days: Long): String = when {
 }
 
 fun formatPrice(cents: Int): String =
-    String.format(Locale("es", "ES"), "%.2f €", cents / 100.0)
+    String.format(Locale.forLanguageTag("es-ES"), "%.2f €", cents / 100.0)
 
 fun parseCents(text: String): Int? =
     text.trim().replace(',', '.').toBigDecimalOrNull()

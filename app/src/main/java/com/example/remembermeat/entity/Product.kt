@@ -11,7 +11,6 @@ data class Product(
     val name: String,
     val store: String,
     val priceCents: Int,
-    val originalPriceCents: Int? = null,
     val expiryDate: LocalDate,
     val photoPath: String? = null,
     val createdAt: Long = System.currentTimeMillis()
