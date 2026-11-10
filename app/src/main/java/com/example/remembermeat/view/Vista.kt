@@ -31,21 +31,39 @@ import com.example.remembermeat.ui.theme.urgencyColor
 import com.example.remembermeat.viewmodel.ProductViewModel
 import java.io.File
 
+
 @Composable
 fun AppRoot(viewModel: ProductViewModel = viewModel()) {
+    val products by viewModel.products.collectAsStateWithLifecycle()
     var showForm by rememberSaveable { mutableStateOf(false) }
+    var editingId by rememberSaveable { mutableStateOf<Long?>(null) } // null = producto nuevo
 
     if (showForm) {
-        ProductFormScreen(
-            onSave = { product ->
-                viewModel.add(product)
-                showForm = false
-            },
-            onCancel = { showForm = false }
-        )
+        val editing = products.firstOrNull { it.id == editingId }
+        if (editingId == null || editing != null) {
+            ProductFormScreen(
+                initial = editing,
+                onSave = { product ->
+                    if (editing == null) viewModel.add(product) else viewModel.update(product)
+                    showForm = false
+                    editingId = null
+                },
+                onCancel = {
+                    showForm = false
+                    editingId = null
+                }
+            )
+        }
     } else {
         ProductListScreen(
-            onAddClick = { showForm = true },
+            onAddClick = {
+                editingId = null
+                showForm = true
+            },
+            onEditClick = { product ->
+                editingId = product.id
+                showForm = true
+            },
             viewModel = viewModel
         )
     }
@@ -54,6 +72,7 @@ fun AppRoot(viewModel: ProductViewModel = viewModel()) {
 @Composable
 fun ProductListScreen(
     onAddClick: () -> Unit,
+    onEditClick: (Product) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProductViewModel = viewModel()
 ) {
@@ -76,7 +95,6 @@ fun ProductListScreen(
         if (products.isEmpty()) {
             EmptyState(onAddClick, Modifier.padding(padding))
         } else {
-            // la lista ya llega ordenada por caducidad, así que los grupos salen en orden
             val groups = products.groupBy { sectionOf(daysLeft(it.expiryDate)) }
 
             LazyColumn(
@@ -88,7 +106,11 @@ fun ProductListScreen(
                 groups.forEach { (title, group) ->
                     item(key = "section-$title") { SectionTitle(title) }
                     items(group, key = { it.id }) { product ->
-                        SwipeRow(product, onRequestDelete = { toDelete = product })
+                        SwipeRow(
+                            product,
+                            onClick = { onEditClick(product) },
+                            onRequestDelete = { toDelete = product }
+                        )
                     }
                 }
             }
@@ -144,11 +166,11 @@ private fun SectionTitle(title: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SwipeRow(product: Product, onRequestDelete: () -> Unit) {
+private fun SwipeRow(product: Product, onClick: () -> Unit, onRequestDelete: () -> Unit) {
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) onRequestDelete()
-            false // la tarjeta vuelve a su sitio; el borrado real lo confirma el diálogo
+            false
         }
     )
     SwipeToDismissBox(
@@ -170,7 +192,7 @@ private fun SwipeRow(product: Product, onRequestDelete: () -> Unit) {
                 )
             }
         }
-    ) { ProductCard(product) }
+    ) { ProductCard(product, onClick) }
 }
 
 @Composable
@@ -196,10 +218,11 @@ private fun EmptyState(onAddClick: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ProductCard(product: Product) {
+fun ProductCard(product: Product, onClick: () -> Unit) {
     val days = daysLeft(product.expiryDate)
 
     Card(
+        onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

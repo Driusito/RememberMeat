@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import com.example.remembermeat.entity.Product
 import kotlinx.coroutines.flow.Flow
 
@@ -15,12 +16,16 @@ interface ProductDao {
     @Insert
     suspend fun insert(product: Product): Long
 
+    @Update
+    suspend fun update(product: Product)
+
     @Delete
     suspend fun delete(product: Product)
 
-    @Query("SELECT * FROM products WHERE expiryDate <= :limitEpochDay ORDER BY expiryDate ASC")
-    suspend fun expiringUntil(limitEpochDay: Long): List<Product>
-
-    @Query("SELECT * FROM products WHERE expiryDate = :epochDay ORDER BY name ASC")
-    suspend fun expiringOn(epochDay: Long): List<Product>
+    @Query(
+        "SELECT * FROM products " +
+                "WHERE expiryDate BETWEEN :fromEpochDay AND :toEpochDay " +
+                "ORDER BY expiryDate ASC, name ASC"
+    )
+    suspend fun expiringBetween(fromEpochDay: Long, toEpochDay: Long): List<Product>
 }

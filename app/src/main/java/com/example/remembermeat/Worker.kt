@@ -1,11 +1,9 @@
 package com.example.remembermeat
 
-import android.Manifest
-import android.R
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
@@ -18,18 +16,29 @@ class ExpiryWorker(
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
 
-    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
+    @SuppressLint("MissingPermission")
     override suspend fun doWork(): Result {
-        val tomorrow = LocalDate.now().plusDays(1).toEpochDay()
-        val products = AppDatabase.get(context).productDao().expiringOn(tomorrow)
+        val today = LocalDate.now()
+        val products = AppDatabase.get(context).productDao()
+            .expiringBetween(today.toEpochDay(), today.plusDays(1).toEpochDay())
         if (products.isEmpty()) return Result.success()
 
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return Result.success()
 
-        val title = if (products.size == 1) "1 producto caduca mañana"
-        else "${products.size} productos caducan mañana"
-        val body = products.joinToString("\n") { "${it.name} (${it.store}) · ${formatPrice(it.priceCents)}" }
+        val todayCount = products.count { it.expiryDate == today }
+        val total = products.size
+        val title = when {
+            todayCount == total ->
+                if (total == 1) "1 producto caduca hoy" else "$total productos caducan hoy"
+            todayCount == 0 ->
+                if (total == 1) "1 producto caduca mañana" else "$total productos caducan mañana"
+            else -> "$total productos caducan hoy o mañana"
+        }
+        val body = products.joinToString("\n") {
+            val whenText = if (it.expiryDate == today) "Hoy" else "Mañana"
+            "$whenText: ${it.name} en ${it.store}, ${formatPrice(it.priceCents)}"
+        }
 
         val openApp = PendingIntent.getActivity(
             context, 0,
@@ -38,7 +47,7 @@ class ExpiryWorker(
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_dialog_info) // temporal
+            .setSmallIcon(android.R.drawable.ic_dialog_info) // temporal
             .setContentTitle(title)
             .setContentText(body.lineSequence().first())
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

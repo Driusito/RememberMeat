@@ -19,31 +19,36 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import coil3.compose.AsyncImage
+import com.example.remembermeat.centsToInput
 import com.example.remembermeat.entity.Product
 import com.example.remembermeat.parseCents
 import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductFormScreen(
+    initial: Product?,
     onSave: (Product) -> Unit,
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
 
-    var name by rememberSaveable { mutableStateOf("") }
-    var store by rememberSaveable { mutableStateOf("") }
-    var price by rememberSaveable { mutableStateOf("") }
-    var expiryEpochDay by rememberSaveable { mutableStateOf<Long?>(null) }
-    var photoPath by rememberSaveable { mutableStateOf<String?>(null) }
+    val originalPhoto = initial?.photoPath
+
+    var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
+    var store by rememberSaveable { mutableStateOf(initial?.store ?: "") }
+    var price by rememberSaveable { mutableStateOf(initial?.let { centsToInput(it.priceCents) } ?: "") }
+    var expiryEpochDay by rememberSaveable { mutableStateOf<Long?>(initial?.expiryDate?.toEpochDay()) }
+    var photoPath by rememberSaveable { mutableStateOf<String?>(originalPhoto) }
     var pendingPath by rememberSaveable { mutableStateOf<String?>(null) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
 
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         if (ok) {
-            photoPath?.let { File(it).delete() } // borra la foto anterior si se repite
+            if (photoPath != originalPhoto) photoPath?.let { File(it).delete() }
             photoPath = pendingPath
         } else {
             pendingPath?.let { File(it).delete() }
@@ -60,7 +65,7 @@ fun ProductFormScreen(
     }
 
     fun cancel() {
-        photoPath?.let { File(it).delete() }
+        if (photoPath != originalPhoto) photoPath?.let { File(it).delete() }
         onCancel()
     }
 
@@ -79,7 +84,10 @@ fun ProductFormScreen(
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Apuntar producto", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                if (initial == null) "Apuntar producto" else "Editar producto",
+                style = MaterialTheme.typography.headlineSmall
+            )
 
             OutlinedTextField(
                 value = name, onValueChange = { name = it },
@@ -134,13 +142,18 @@ fun ProductFormScreen(
                     enabled = canSave,
                     onClick = {
                         if (priceCents != null && day != null) {
+                            if (originalPhoto != null && photoPath != originalPhoto) {
+                                File(originalPhoto).delete()
+                            }
                             onSave(
                                 Product(
+                                    id = initial?.id ?: 0,
                                     name = name.trim(),
                                     store = store.trim(),
                                     priceCents = priceCents,
                                     expiryDate = LocalDate.ofEpochDay(day),
-                                    photoPath = photoPath
+                                    photoPath = photoPath,
+                                    createdAt = initial?.createdAt ?: System.currentTimeMillis()
                                 )
                             )
                         }

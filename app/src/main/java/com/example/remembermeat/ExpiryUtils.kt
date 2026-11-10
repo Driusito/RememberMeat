@@ -24,3 +24,6 @@ fun parseCents(text: String): Int? =
         ?.movePointRight(2)
         ?.setScale(0, RoundingMode.HALF_UP)
         ?.toInt()
+
+fun centsToInput(cents: Int): String =
+    "${cents / 100},${(cents % 100).toString().padStart(2, '0')}"

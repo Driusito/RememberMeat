@@ -23,6 +23,10 @@ class ProductViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { dao.insert(product) }
     }
 
+    fun update(product: Product) {
+        viewModelScope.launch { dao.update(product) }
+    }
+
     fun delete(product: Product) {
         viewModelScope.launch {
             dao.delete(product)
